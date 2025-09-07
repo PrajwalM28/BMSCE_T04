@@ -1,41 +1,148 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-# Tiny Tapeout Verilog Project Template
+# CRC-3 Module with Latch-Based Clock Gating
 
-- [Read the documentation for project](docs/info.md)
+Overview
 
-## What is Tiny Tapeout?
+This project implements a CRC-3 (Cyclic Redundancy Check) module optimized with Latch-Based Clock Gating for low-power operation. It is designed for integration into a 1×1 Tiny Tapeout tile chip.
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+The system computes a 3-bit CRC using a Linear Feedback Shift Register (LFSR) based on the polynomial:
 
-To learn more and get started, visit https://tinytapeout.com.
+P(x) = x^3 + x + 1 \quad (binary\ 1011)
 
-## Set up your Verilog project
+The latch-based clock gating technique reduces power by disabling the clock when not needed, while preventing glitches with a transparent latch.
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
 
-The GitHub action will automatically build the ASIC files using [OpenLane](https://www.zerotoasiccourse.com/terminology/openlane/).
+---
 
-## Enable GitHub actions to build the results page
+Features
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+Error detection using CRC-3 polynomial (1011)
 
-## Resources
+Serial data input (ui_in[1]) processed bit-by-bit per clock cycle
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
+Latch-based clock gating controlled by ui_in[0] (enable signal)
 
-## What next?
+Low-power design by stopping clock activity when not enabled
 
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
+Compact implementation for Tiny Tapeout tile constraints
+
+
+
+---
+
+Block Diagram
+
+
+![17572599072393043403612168572490](https://github.com/user-attachments/assets/5d237886-0e05-495c-8e1a-3583079dd057)
+
+
+---
+
+I/O Description
+
+Signal	Direction	Description
+
+clk	Input	System clock
+rst_n	Input	Active-low reset
+ui_in[0]	Input	Enable signal for latch-based clock gating
+ui_in[1]	Input	Serial data input
+uo_out[2:0]	Output	3-bit CRC value
+
+
+
+---
+
+How It Works
+
+1. When ui_in[0] = 1, the gated clock is enabled and data bits from ui_in[1] are shifted into the LFSR.
+
+
+2. The CRC-3 calculation follows the polynomial (x^3 + x + 1).
+
+
+3. When ui_in[0] = 0, the gated clock is disabled, freezing internal logic to save power.
+
+
+4. The final 3-bit CRC result is available at uo_out[2:0].
+
+
+
+
+---
+
+How to Test
+
+1. Reset the module by setting rst_n = 0, then release (rst_n = 1).
+
+
+2. Enable clock gating by driving ui_in[0] = 1.
+
+
+3. Feed serial data through ui_in[1].
+
+Example: input sequence 110100 (pad with 3 zeros → 110100000)
+
+Expected CRC output = 101
+
+
+
+4. Disable clock gating (ui_in[0] = 0) and observe that the internal clock stops toggling.
+
+
+5. Check results using a simulation tool (e.g., Icarus Verilog + GTKWave).
+
+
+
+
+---
+
+Sample Simulation Waveform
+
+<img width="1814" height="425" alt="17572599598632259848741214954965" src="https://github.com/user-attachments/assets/a5511f60-9539-49d0-b847-ce9dfe3c1bd8" />
+
+
+The waveform shows:
+
+Proper CRC computation (uo_out[2:0] = 101 for example sequence)
+
+Clock gating effect when ui_in[0] is toggled
+
+
+
+---
+
+File Structure
+
+src/          → Verilog source (CRC module + latch gating)  
+test/         → Testbench and simulation files  
+docs/         → Documentation (block diagram, waveform, info.md)  
+info.yaml     → Metadata (top module, sources, etc.)  
+README.md     → This documentation
+
+
+---
+
+References
+
+Tiny Tapeout Documentation
+
+Digital Design and LFSR theory for CRC computation
+
+
+
+---
+
+Credits & Acknowledgments
+
+Prof. Dr. JayaGowri – Guidance and Mentorship
+
+BMS College of Engineering – Institutional support
+
+IEEE EDS – Knowledge sharing and community support
+
+Tiny Tapeout Team – Providing the platform for open-source chip design
+
+
+
+---
