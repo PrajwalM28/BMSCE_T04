@@ -34,13 +34,22 @@ async def test_project(dut):
         await ClockCycles(dut.clk, 1)
         dut._log.debug(f"Cycle {idx}, in={b}, uo_out={dut.uo_out.value.binstr}")
 
-    # Extra cycles for GL netlist to settle
-    await ClockCycles(dut.clk, 12)
+    # Wait extra cycles until output stabilizes (handles GL timing/X)
+    expected_val = 0xAD
+    out_val = 0
+    for i in range(30):  # up to 30 extra cycles
+        await ClockCycles(dut.clk, 1)
+        raw_str = dut.uo_out.value.binstr
+        safe_str = (
+            raw_str.replace("x", "0")
+                   .replace("X", "0")
+                   .replace("z", "0")
+                   .replace("Z", "0")
+        )
+        out_val = int(safe_str, 2)
+        if out_val != 0:  # assume non-zero means settled
+            dut._log.debug(f"Stabilized after {i+1} cycles: {safe_str} -> {out_val:02X}")
+            break
 
-    # Safely resolve X/Z -> 0
-    raw_str = dut.uo_out.value.binstr
-    safe_str = raw_str.replace("x", "0").replace("X", "0").replace("z", "0").replace("Z", "0")
-    out_val = int(safe_str, 2)
-
-    dut._log.info(f"Final uo_out = 0x{out_val:02X} (expected 0xAD)")
-    assert (out_val & 0xFF) == 0xAD, f"Expected 0xAD, got 0x{out_val:02X}"
+    dut._log.info(f"Final uo_out = 0x{out_val:02X} (expected 0x{expected_val:02X})")
+    assert (out_val & 0xFF) == expected_val, f"Expected 0x{expected_val:02X}, got 0x{out_val:02X}"
