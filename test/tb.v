@@ -1,49 +1,60 @@
+`timescale 1ns/1ps
 `default_nettype none
-`timescale 1ns / 1ps
 
-/* This testbench just instantiates the module and makes some convenient wires
-   that can be driven / tested by the cocotb test.py.
-*/
-module tb ();
+module tb_crc3;
+    reg clk;
+    reg rst_n;
+    reg [7:0] ui_in;
+    wire [7:0] uo_out;
 
-  // Dump the signals to a VCD file. You can view it with gtkwave or surfer.
-  initial begin
-    $dumpfile("tb.vcd");
-    $dumpvars(0, tb);
-    #1;
-  end
+    // DUT
+    tt_um_crc3 dut (
+        .ui_in(ui_in),
+        .uo_out(uo_out),
+        .uio_in(8'b0),
+        .uio_out(),
+        .uio_oe(),
+        .ena(1'b1),
+        .clk(clk),
+        .rst_n(rst_n)
+    );
 
-  // Wire up the inputs and outputs:
-  reg clk;
-  reg rst_n;
-  reg ena;
-  reg [7:0] ui_in;
-  reg [7:0] uio_in;
-  wire [7:0] uo_out;
-  wire [7:0] uio_out;
-  wire [7:0] uio_oe;
-`ifdef GL_TEST
-  wire VPWR = 1'b1;
-  wire VGND = 1'b0;
-`endif
+    // 100 MHz
+    initial clk = 1'b0;
+    always #5 clk = ~clk;
 
-  // Replace tt_um_example with your module name:
-  tt_um_example user_project (
+    initial begin
+        $dumpfile("tb.vcd");
+        $dumpvars(0, tb_crc3);
 
-      // Include power ports for the Gate Level test:
-`ifdef GL_TEST
-      .VPWR(VPWR),
-      .VGND(VGND),
-`endif
+        // Reset
+        rst_n = 0; ui_in = 8'b0;
+        repeat (5) @(posedge clk);
+        rst_n = 1;
 
-      .ui_in  (ui_in),    // Dedicated inputs
-      .uo_out (uo_out),   // Dedicated outputs
-      .uio_in (uio_in),   // IOs: Input path
-      .uio_out(uio_out),  // IOs: Output path
-      .uio_oe (uio_oe),   // IOs: Enable path (active high: 0=input, 1=output)
-      .ena    (ena),      // enable - goes high when design is selected
-      .clk    (clk),      // clock
-      .rst_n  (rst_n)     // not reset
-  );
+        // Enable shifting
+        ui_in[0] = 1'b1;
 
+        // Send message 10101 (MSB-first) then 3 padding zeros
+        // Drive ui_in[1] just before posedge so DUT samples at posedge
+        ui_in[1] = 1; @(posedge clk);
+        ui_in[1] = 0; @(posedge clk);
+        ui_in[1] = 1; @(posedge clk);
+        ui_in[1] = 0; @(posedge clk);
+        ui_in[1] = 1; @(posedge clk);
+        ui_in[1] = 0; @(posedge clk); // padding
+        ui_in[1] = 0; @(posedge clk); // padding
+        ui_in[1] = 0; @(posedge clk); // padding
+
+        // One more cycle to see the registered output
+        @(posedge clk);
+
+        // Disable
+        ui_in[0] = 1'b0; @(posedge clk);
+
+        $display("uo_out = 0x%02h (expected 0xAD)", uo_out);
+        $finish;
+    end
 endmodule
+
+`default_nettype wire
