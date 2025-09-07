@@ -10,8 +10,8 @@ from cocotb.triggers import ClockCycles
 async def test_project(dut):
     dut._log.info("Start")
 
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, units="us")
+    # 100 MHz clock (10 ns period)
+    clock = Clock(dut.clk, 10, units="ns")
     cocotb.start_soon(clock.start())
 
     # Reset
@@ -20,21 +20,28 @@ async def test_project(dut):
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
+    await ClockCycles(dut.clk, 5)
     dut.rst_n.value = 1
 
-    dut._log.info("Test project behavior")
+    dut._log.info("Begin shifting bits")
 
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
+    # Enable = 1
+    dut.ui_in[0].value = 1
 
-    # Wait for one clock cycle to see the output values
+    # Send message bits: 10101 (MSB-first) + 000 padding
+    bits = [1, 0, 1, 0, 1, 0, 0, 0]
+    for b in bits:
+        dut.ui_in[1].value = b
+        await ClockCycles(dut.clk, 1)
+
+    # One more cycle for DUT to latch output
     await ClockCycles(dut.clk, 1)
 
-    # The following assersion is just an example of how to check the output values.
-    # Change it to match the actual expected output of your module:
-    assert dut.uo_out.value == 50
+    # Log and check result
+    out_val = int(dut.uo_out.value)
+    dut._log.info(f"uo_out = 0x{out_val:02X} (expected 0xAD)")
+    assert out_val == 0xAD, f"Expected 0xAD, got 0x{out_val:02X}"
 
-    # Keep testing the module by changing the input values, waiting for
-    # one or more clock cycles, and asserting the expected output values.
+    # Disable
+    dut.ui_in[0].value = 0
+    await ClockCycles(dut.clk, 1)
