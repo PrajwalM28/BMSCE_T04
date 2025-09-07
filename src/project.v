@@ -29,6 +29,10 @@ module tt_um_crc3 (
     reg  [3:0] bit_count;  // 0..8
     reg  [7:0] out_reg;    // registered output
 
+    // Next-state holders
+    reg  [4:0] msg_next;
+    reg  [2:0] crc_next;
+
     // Tie off IOs
     assign uio_out = 8'b0;
     assign uio_oe  = 8'b0;
@@ -40,41 +44,38 @@ module tt_um_crc3 (
     // Drive outputs
     assign uo_out = out_reg;
 
-    // Next-bit logic (outside always block)
+    // Next-bit logic
     wire next_bit = (bit_count < 4'd5) ? data_in : 1'b0;
 
     // Synchronous design, no gated clocks, no latches
-   always @(posedge clk or posedge reset) begin
-    if (reset) begin
-        msg_reg   <= 5'b0;
-        crc_reg   <= 3'b0;
-        bit_count <= 4'd0;
-        out_reg   <= 8'b0;
-    end else if (ena) begin
-        if (enable) begin
-            reg [4:0] msg_next;
-            reg [2:0] crc_next;
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            msg_reg   <= 5'b0;
+            crc_reg   <= 3'b0;
+            bit_count <= 4'd0;
+            out_reg   <= 8'b0;
+        end else if (ena) begin
+            if (enable) begin
+                msg_next = (bit_count < 4'd5) ? {msg_reg[3:0], data_in} : msg_reg;
+                crc_next = { next_bit ^ crc_reg[2] ^ crc_reg[0], crc_reg[2:1] };
 
-            msg_next = (bit_count < 4'd5) ? {msg_reg[3:0], data_in} : msg_reg;
-            crc_next = { next_bit ^ crc_reg[2] ^ crc_reg[0], crc_reg[2:1] };
+                if (bit_count < 4'd8) begin
+                    msg_reg   <= msg_next;
+                    crc_reg   <= crc_next;
+                    bit_count <= bit_count + 1'b1;
 
-            if (bit_count < 4'd8) begin
-                msg_reg   <= msg_next;
-                crc_reg   <= crc_next;
-                bit_count <= bit_count + 1'b1;
-
-                if (bit_count == 4'd7)
-                    out_reg <= {msg_next, crc_next};
-                else
-                    out_reg <= 8'b0;
-            end else begin
-                // hold result while enable remains high
-                out_reg <= {msg_reg, crc_reg};
+                    if (bit_count == 4'd7)
+                        out_reg <= {msg_next, crc_next};
+                    else
+                        out_reg <= 8'b0;
+                end else begin
+                    // hold result while enable remains high
+                    out_reg <= {msg_reg, crc_reg};
+                end
             end
+            // if enable=0 → hold state, don’t reset
         end
-        // if enable=0 → hold state, don’t reset
     end
-end
 
 endmodule
 
