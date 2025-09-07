@@ -4,27 +4,26 @@ from cocotb.triggers import ClockCycles
 
 @cocotb.test()
 async def test_project(dut):
-    """CRC-3 codeword generator test with GL-safe handling."""
+    """CRC-3 with latch-based clock gating — GL-safe test."""
 
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
 
-    # Initialize
+    # === RESET ===
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     dut.rst_n.value = 0
-
-    # Longer reset for GL
-    await ClockCycles(dut.clk, 20)
+    await ClockCycles(dut.clk, 20)   # longer reset for GL
     dut.rst_n.value = 1
-    await ClockCycles(dut.clk, 10)
+    await ClockCycles(dut.clk, 10)   # let signals stabilize
 
-    dut._log.info("Begin shifting bits")
+    dut._log.info("Reset done, starting test")
 
-    # Enable gating
+    # === ENABLE CLOCK GATING ===
     dut.ui_in[0].value = 1
 
-    # Message: 10101 padded with 000 -> expected codeword 0xAD
+    # === MESSAGE SEQUENCE ===
+    # 10101 + 000 padding = expected CRC codeword 0xAD
     bits = [1, 0, 1, 0, 1, 0, 0, 0]
 
     for idx, b in enumerate(bits):
@@ -32,13 +31,14 @@ async def test_project(dut):
         await ClockCycles(dut.clk, 1)
         dut._log.info(f"Cycle {idx}: input={b}, uo_out={dut.uo_out.value.binstr}")
 
-    # Extra wait for CRC to settle
-    await ClockCycles(dut.clk, 5)
+    # === WAIT FOR CRC TO SETTLE (important for GL) ===
+    await ClockCycles(dut.clk, 10)
 
-    # Read GL-safe output
+    # === READ OUTPUT (GL-safe) ===
     binstr = dut.uo_out.value.binstr.replace("x", "0").replace("X", "0")
     out_val = int(binstr, 2)
 
     dut._log.info(f"Final uo_out = 0x{out_val:02X} (expected 0xAD)")
 
+    # === ASSERTION ===
     assert (out_val & 0xFF) == 0xAD, f"Expected 0xAD, got 0x{out_val:02X}"
