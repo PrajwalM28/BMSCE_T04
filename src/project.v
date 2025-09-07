@@ -29,9 +29,10 @@ module tt_um_crc3 (
     reg  [3:0] bit_count;  // 0..8
     reg  [7:0] out_reg;    // registered output
 
-    // Next-state holders
-    reg  [4:0] msg_next;
-    reg  [2:0] crc_next;
+    // Combinational next-state signals (no regs declared inside always)
+    wire       shift_in = (bit_count < 4'd5) ? data_in : 1'b0;
+    wire [4:0] msg_next_w = (bit_count < 4'd5) ? {msg_reg[3:0], data_in} : msg_reg;
+    wire [2:0] crc_next_w = { (shift_in ^ crc_reg[2] ^ crc_reg[0]), crc_reg[2:1] };
 
     // Tie off IOs
     assign uio_out = 8'b0;
@@ -44,9 +45,6 @@ module tt_um_crc3 (
     // Drive outputs
     assign uo_out = out_reg;
 
-    // Next-bit logic
-    wire next_bit = (bit_count < 4'd5) ? data_in : 1'b0;
-
     // Synchronous design, no gated clocks, no latches
     always @(posedge clk or posedge reset) begin
         if (reset) begin
@@ -56,25 +54,31 @@ module tt_um_crc3 (
             out_reg   <= 8'b0;
         end else if (ena) begin
             if (enable) begin
-                msg_next = (bit_count < 4'd5) ? {msg_reg[3:0], data_in} : msg_reg;
-                crc_next = { next_bit ^ crc_reg[2] ^ crc_reg[0], crc_reg[2:1] };
+                // update shift registers
+                msg_reg <= msg_next_w;
+                crc_reg <= crc_next_w;
 
-                if (bit_count < 4'd8) begin
-                    msg_reg   <= msg_next;
-                    crc_reg   <= crc_next;
+                // update bit counter (saturate at 8)
+                if (bit_count < 4'd8)
                     bit_count <= bit_count + 1'b1;
+                else
+                    bit_count <= bit_count;
 
-                    if (bit_count == 4'd7)
-                        out_reg <= {msg_next, crc_next};
-                    else
-                        out_reg <= 8'b0;
-                end else begin
-                    // hold result while enable remains high
-                    out_reg <= {msg_reg, crc_reg};
-                end
+                // drive output after the 8th bit has been processed
+                // When bit_count == 7 this will capture the new (msg_next_w, crc_next_w)
+                if (bit_count >= 4'd7)
+                    out_reg <= {msg_next_w, crc_next_w};
+                else
+                    out_reg <= 8'b0;
+            end else begin
+                // enable == 0 : hold state (no reset)
+                msg_reg   <= msg_reg;
+                crc_reg   <= crc_reg;
+                bit_count <= bit_count;
+                out_reg   <= out_reg;
             end
-            // if enable=0 → hold state, don’t reset
         end
+        // if ena == 0 : do nothing (hold current state)
     end
 
 endmodule
