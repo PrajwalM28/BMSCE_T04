@@ -41,13 +41,14 @@ Block Diagram
 
 I/O Description
 
-Signal	Direction	Description
+| Signal        | Direction | Description                                |
+| ------------- | --------- | ------------------------------------------ |
+| `clk`         | Input     | System clock                               |
+| `rst_n`       | Input     | Active-low reset                           |
+| `ui_in[0]`    | Input     | Enable signal for latch-based clock gating |
+| `ui_in[1]`    | Input     | Serial data input                          |
+| `uo_out[2:0]` | Output    | 3-bit CRC value                            |
 
-clk	Input	System clock
-rst_n	Input	Active-low reset
-ui_in[0]	Input	Enable signal for latch-based clock gating
-ui_in[1]	Input	Serial data input
-uo_out[2:0]	Output	3-bit CRC value
 
 
 
